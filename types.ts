@@ -3,14 +3,18 @@ export interface PayrollInputs {
   dependents: number;
   transportationVoucherValue: number;
   mealVoucherValue: number;
+  healthPlanCost: number;
+  lifeInsuranceCost: number;
   workingDays: number;
   hasTransportationVoucher: boolean;
   hasMealVoucher: boolean;
+  hasHealthPlan: boolean;
+  hasLifeInsurance: boolean;
   includeThirteenth: boolean;
   includeVacation: boolean;
   includeFgtsFine: boolean;
-  includeEmployerTaxes: boolean;
   contractType: 'clt' | 'apprentice';
+  taxRegime: 'simples' | 'presumido_real';
 }
 
 export interface PayrollResults {
@@ -28,6 +32,8 @@ export interface PayrollResults {
     fgts: number;
     transportationVoucherCost: number;
     mealVoucherCost: number;
+    healthPlanCost: number;
+    lifeInsuranceCost: number;
     employerInss: number;
     thirdPartyContributions: number;
     thirteenthSalaryProvision: number;

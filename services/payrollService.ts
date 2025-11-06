@@ -1,3 +1,4 @@
+
 import type { PayrollInputs, PayrollResults } from '../types';
 import {
   INSS_BRACKETS,
@@ -52,14 +53,18 @@ export function calculatePayroll(inputs: PayrollInputs): PayrollResults {
     dependents,
     transportationVoucherValue,
     mealVoucherValue,
+    healthPlanCost,
+    lifeInsuranceCost,
     workingDays,
     hasTransportationVoucher,
     hasMealVoucher,
+    hasHealthPlan,
+    hasLifeInsurance,
     includeThirteenth,
     includeVacation,
     includeFgtsFine,
-    includeEmployerTaxes,
     contractType,
+    taxRegime,
   } = inputs;
 
   const fgtsRate = contractType === 'apprentice' ? FGTS_RATE_APPRENTICE : FGTS_RATE_CLT;
@@ -74,12 +79,16 @@ export function calculatePayroll(inputs: PayrollInputs): PayrollResults {
   const netSalary = grossSalary - totalDeductions;
 
   // Employer Calculations
-  // Direct monthly costs
   const fgts = grossSalary * fgtsRate;
   const transportationVoucherCost = totalTransportationCost > 0 ? totalTransportationCost - transportationVoucherDiscount : 0;
-  const mealVoucherCost = hasMealVoucher ? mealVoucherValue * workingDays : 0;
-  const employerInss = includeEmployerTaxes ? grossSalary * EMPLOYER_INSS_RATE : 0;
-  const thirdPartyContributions = includeEmployerTaxes ? grossSalary * (RAT_RATE + THIRD_PARTY_RATE) : 0;
+  const mealVoucherCostValue = hasMealVoucher ? mealVoucherValue * workingDays : 0;
+  const healthPlanCostValue = hasHealthPlan ? healthPlanCost : 0;
+  const lifeInsuranceCostValue = hasLifeInsurance ? lifeInsuranceCost : 0;
+
+  // Direct monthly costs based on Tax Regime
+  const isPresumidoReal = taxRegime === 'presumido_real';
+  const employerInss = isPresumidoReal ? grossSalary * EMPLOYER_INSS_RATE : 0;
+  const thirdPartyContributions = isPresumidoReal ? grossSalary * (RAT_RATE + THIRD_PARTY_RATE) : 0;
 
   // Monthly Provisions
   const thirteenthSalaryProvision = includeThirteenth ? grossSalary / 12 : 0;
@@ -89,8 +98,7 @@ export function calculatePayroll(inputs: PayrollInputs): PayrollResults {
   const annualProvisionsBase = thirteenthSalaryProvision + vacationProvision + vacationBonusProvision;
   const fgtsOnProvisions = annualProvisionsBase * fgtsRate;
   
-  // Employer taxes on 13th salary also need to be provisioned
-  const thirteenthProvisionTaxes = includeEmployerTaxes && includeThirteenth 
+  const thirteenthProvisionTaxes = isPresumidoReal && includeThirteenth 
     ? thirteenthSalaryProvision * (EMPLOYER_INSS_RATE + RAT_RATE + THIRD_PARTY_RATE) 
     : 0;
 
@@ -98,7 +106,7 @@ export function calculatePayroll(inputs: PayrollInputs): PayrollResults {
   const fgtsFineProvision = includeFgtsFine ? totalMonthlyFgtsDeposit * 0.40 : 0;
 
   const totalProvisions = annualProvisionsBase + fgtsOnProvisions + fgtsFineProvision + thirteenthProvisionTaxes;
-  const totalMonthlyDirectCosts = grossSalary + fgts + transportationVoucherCost + mealVoucherCost + employerInss + thirdPartyContributions;
+  const totalMonthlyDirectCosts = grossSalary + fgts + transportationVoucherCost + mealVoucherCostValue + healthPlanCostValue + lifeInsuranceCostValue + employerInss + thirdPartyContributions;
   const totalCost = totalMonthlyDirectCosts + totalProvisions;
 
   return {
@@ -110,7 +118,9 @@ export function calculatePayroll(inputs: PayrollInputs): PayrollResults {
       grossSalary,
       fgts: parseFloat(fgts.toFixed(2)),
       transportationVoucherCost: parseFloat(transportationVoucherCost.toFixed(2)),
-      mealVoucherCost: parseFloat(mealVoucherCost.toFixed(2)),
+      mealVoucherCost: parseFloat(mealVoucherCostValue.toFixed(2)),
+      healthPlanCost: parseFloat(healthPlanCostValue.toFixed(2)),
+      lifeInsuranceCost: parseFloat(lifeInsuranceCostValue.toFixed(2)),
       employerInss: parseFloat(employerInss.toFixed(2)),
       thirdPartyContributions: parseFloat(thirdPartyContributions.toFixed(2)),
       thirteenthSalaryProvision: parseFloat(thirteenthSalaryProvision.toFixed(2)),
