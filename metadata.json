@@ -1,0 +1,5 @@
+{
+  "name": "Calculadora de Encargos e Benefícios",
+  "description": "Uma aplicação web para calcular encargos trabalhistas (INSS, FGTS, IRRF), benefícios e o custo total de um colaborador para a empresa a partir do salário bruto.",
+  "requestFramePermissions": []
+}
