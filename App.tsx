@@ -8,13 +8,20 @@ import { Hero } from './components/Hero';
 import { FeatureSection } from './components/FeatureSection';
 import { CTA } from './components/CTA';
 
+// Seed inicial — atualize conforme crescimento real via painel Umami
+const SIMULATION_SEED = 2400;
+
 const App: React.FC = () => {
   const [results, setResults] = useState<PayrollResults | null>(null);
+  const [simulationCount, setSimulationCount] = useState(SIMULATION_SEED);
   const calculatorRef = useRef<HTMLDivElement>(null);
 
   const handleCalculate = (inputs: PayrollInputs) => {
     const calculatedResults = calculatePayroll(inputs);
     setResults(calculatedResults);
+    setSimulationCount(prev => prev + 1);
+    // Umami: rastreia evento de simulação (ativo após configurar o script)
+    (window as any).umami?.track('simulation_calculated');
   };
 
   const scrollToCalculator = () => {
@@ -46,7 +53,7 @@ const App: React.FC = () => {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Hero onPrimaryActionClick={scrollToCalculator} />
+        <Hero onPrimaryActionClick={scrollToCalculator} simulationCount={simulationCount} />
 
         <FeatureSection />
 
@@ -70,7 +77,7 @@ const App: React.FC = () => {
             <a href="https://bildee.com.br" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-cyan-400 transition-colors font-semibold">Bildee</a>
             {' '}— Sua Visão, Nossa Missão.
           </p>
-          <p className="text-gray-700 text-xs mt-3">© {new Date().getFullYear()} Bildee. Todos os direitos reservados. Valores de 2024 — simulação para fins educacionais.</p>
+          <p className="text-gray-700 text-xs mt-3">© {new Date().getFullYear()} Bildee. Todos os direitos reservados. Tabelas INSS 2025 — simulação para fins educacionais.</p>
         </footer>
       </div>
     </div>

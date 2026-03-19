@@ -1,15 +1,17 @@
 import type { TaxBracket } from './types';
 
-// INSS brackets for 2024
+// INSS brackets for 2025 (Portaria MPS 1.419/2024)
 export const INSS_BRACKETS: TaxBracket[] = [
-  { limit: 1412.00, rate: 0.075 },
-  { limit: 2666.68, rate: 0.09 },
-  { limit: 4000.03, rate: 0.12 },
-  { limit: 7786.02, rate: 0.14 },
+  { limit: 1518.00, rate: 0.075 },
+  { limit: 2793.88, rate: 0.09 },
+  { limit: 4190.83, rate: 0.12 },
+  { limit: 8157.41, rate: 0.14 },
 ];
-export const INSS_CEILING = 7786.02;
+export const INSS_CEILING = 8157.41;
 
-// IRRF brackets for 2024
+// IRRF brackets for 2025 (RIR - Decreto 9.580/2018, vigência 2025)
+// Nota: o projeto de isenção até R$ 5.000 (previsto para 2026) deve ser verificado
+// e atualizado conforme legislação publicada.
 export const IRRF_BRACKETS: TaxBracket[] = [
   { limit: 2259.20, rate: 0, deduction: 0 },
   { limit: 2826.65, rate: 0.075, deduction: 169.44 },
