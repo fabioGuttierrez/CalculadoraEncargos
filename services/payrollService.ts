@@ -134,3 +134,29 @@ export function calculatePayroll(inputs: PayrollInputs): PayrollResults {
     },
   };
 }
+
+export function calculatePJComparison(cltResults: PayrollResults, pjTaxRate: number) {
+  const { netSalary } = cltResults.employee;
+  const { totalCost, grossSalary } = cltResults.employer;
+
+  // Nota fiscal que o empregador precisaria pagar para o trabalhador ter o mesmo líquido
+  const pjGrossToMatchNet = parseFloat((netSalary / (1 - pjTaxRate)).toFixed(2));
+  const pjTaxesPaidByWorker = parseFloat((pjGrossToMatchNet * pjTaxRate).toFixed(2));
+  const employerSavingsVsClt = parseFloat((totalCost - pjGrossToMatchNet).toFixed(2));
+  const annualCltCost = parseFloat((totalCost * 12).toFixed(2));
+  const annualPjCost = parseFloat((pjGrossToMatchNet * 12).toFixed(2));
+  const annualSavingsVsClt = parseFloat((annualCltCost - annualPjCost).toFixed(2));
+  const costPerHour = parseFloat((totalCost / (cltResults.inputs.workingDays * 8)).toFixed(2));
+  const overheadPercent = parseFloat(((totalCost / grossSalary - 1) * 100).toFixed(1));
+
+  return {
+    pjGrossToMatchNet,
+    pjTaxesPaidByWorker,
+    employerSavingsVsClt,
+    annualCltCost,
+    annualPjCost,
+    annualSavingsVsClt,
+    costPerHour,
+    overheadPercent,
+  };
+}

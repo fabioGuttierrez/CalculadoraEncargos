@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { PayrollResults } from '../types';
 import { DownloadIcon, UserIcon, BuildingIcon, ChartPieIcon, InfoIcon } from './Icons';
 import { Tooltip } from './Tooltip';
 import { PieChart } from './PieChart';
+import { calculatePJComparison } from '../services/payrollService';
 
 interface ResultsDisplayProps {
   results: PayrollResults | null;
@@ -41,6 +42,11 @@ const ResultCard: React.FC<{ title: string; icon: React.ReactNode; children: Rea
 );
 
 export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
+  const [pjTaxRate, setPjTaxRate] = useState(0.155);
+  const [includePjCounter, setIncludePjCounter] = useState(true);
+  const [pjCounterCost, setPjCounterCost] = useState(150);
+  const [includePjProLaboreInss, setIncludePjProLaboreInss] = useState(false);
+
   const handleExportCSV = () => {
     if (!results) return;
 
@@ -104,6 +110,14 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
   }
 
   const directChargesAndBenefits = results.employer.fgts + results.employer.transportationVoucherCost + results.employer.mealVoucherCost + results.employer.healthPlanCost + results.employer.lifeInsuranceCost + results.employer.employerInss + results.employer.thirdPartyContributions;
+  const comparison = calculatePJComparison(results, pjTaxRate);
+
+  const PJ_PROLABORE_INSS_EST = 167;
+  const pjHiddenCosts = (includePjCounter ? pjCounterCost : 0) + (includePjProLaboreInss ? PJ_PROLABORE_INSS_EST : 0);
+  const adjustedPjMonthlyCost = comparison.pjGrossToMatchNet + pjHiddenCosts;
+  const adjustedPjAnnualCost = adjustedPjMonthlyCost * 12;
+  const realSavingsVsClt = results.employer.totalCost - adjustedPjMonthlyCost;
+  const realAnnualSavingsVsClt = comparison.annualCltCost - adjustedPjAnnualCost;
   const fgtsRateLabel = results.inputs.contractType === 'apprentice' ? '2%' : '8%';
   const fgtsTooltip = `Depósito mensal de ${fgtsRateLabel} sobre o salário bruto em uma conta vinculada ao colaborador, sem desconto do seu salário. A alíquota para aprendizes é de 2%.`;
   const employerTaxesTooltip = "Contribuições para Risco Ambiental de Trabalho (RAT) e outras entidades (Sistema S). Alíquota média de 5.8%. Aplicável apenas em Lucro Presumido/Real.";
@@ -130,6 +144,16 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
               <p className="text-3xl font-bold text-cyan-400">{formatCurrency(results.employer.totalCost)}</p>
             </div>
             <PieChart data={chartData} />
+            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-700">
+              <div className="text-center">
+                <span className="text-gray-400 text-xs block">Custo Anual</span>
+                <p className="text-base font-bold text-indigo-400">{formatCurrency(comparison.annualCltCost)}</p>
+              </div>
+              <div className="text-center">
+                <span className="text-gray-400 text-xs block">Custo por Hora</span>
+                <p className="text-base font-bold text-pink-400">{formatCurrency(comparison.costPerHour)}</p>
+              </div>
+            </div>
         </ResultCard>
       </div>
 
@@ -169,6 +193,128 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
                   </div>
                 )}
             </div>
+        </div>
+      </div>
+
+      {/* Comparativo CLT × PJ */}
+      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+          <h3 className="text-xl font-bold text-cyan-400">Comparativo CLT × PJ</h3>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-400 whitespace-nowrap">Regime PJ:</label>
+            <select
+              value={pjTaxRate}
+              onChange={(e) => setPjTaxRate(parseFloat(e.target.value))}
+              className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1.5 text-white text-sm focus:ring-cyan-500 focus:border-cyan-500"
+            >
+              <option value={0.06}>Simples Nacional ~6%</option>
+              <option value={0.1155}>Simples Nacional ~11,55%</option>
+              <option value={0.155}>Simples Nacional ~15,5%</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Custos operacionais do PJ */}
+        <div className="bg-gray-700/40 rounded-lg p-4 mb-5">
+          <p className="text-sm font-semibold text-gray-300 mb-3">Incluir custos operacionais do PJ</p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includePjCounter}
+                onChange={(e) => setIncludePjCounter(e.target.checked)}
+                className="w-4 h-4 rounded accent-cyan-500"
+              />
+              <span className="text-sm text-gray-300">Contador mensal</span>
+              {includePjCounter && (
+                <input
+                  type="number"
+                  value={pjCounterCost}
+                  onChange={(e) => setPjCounterCost(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-20 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm text-right"
+                  min="0"
+                />
+              )}
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includePjProLaboreInss}
+                onChange={(e) => setIncludePjProLaboreInss(e.target.checked)}
+                className="w-4 h-4 rounded accent-cyan-500"
+              />
+              <span className="text-sm text-gray-300">INSS pró-labore <span className="text-gray-500">(est. R$ 167)</span></span>
+            </label>
+          </div>
+        </div>
+
+        {/* Colunas CLT vs PJ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+          {/* CLT */}
+          <div className="bg-indigo-900/30 border border-indigo-700/50 rounded-lg p-4">
+            <h4 className="font-bold text-indigo-300 mb-3 text-center text-sm uppercase tracking-wide">CLT</h4>
+            <div className="space-y-1">
+              <ResultRow label="Custo mensal empresa" value={formatCurrency(results.employer.totalCost)} />
+              <ResultRow label="Custo anual empresa" value={formatCurrency(comparison.annualCltCost)} />
+              <ResultRow label="Encargo sobre salário" value={`+${comparison.overheadPercent}%`} />
+              <ResultRow label="Líquido colaborador" value={formatCurrency(results.employee.netSalary)} />
+            </div>
+          </div>
+
+          {/* PJ */}
+          <div className="bg-cyan-900/30 border border-cyan-700/50 rounded-lg p-4">
+            <h4 className="font-bold text-cyan-300 mb-3 text-center text-sm uppercase tracking-wide">PJ — custo estimado real</h4>
+            <div className="space-y-1">
+              <ResultRow label="Nota fiscal mensal" value={formatCurrency(comparison.pjGrossToMatchNet)} />
+              {includePjCounter && <ResultRow label="(+) Contador est." value={formatCurrency(pjCounterCost)} />}
+              {includePjProLaboreInss && <ResultRow label="(+) INSS pró-labore est." value={formatCurrency(PJ_PROLABORE_INSS_EST)} />}
+              <ResultRow label="Custo total estimado" value={formatCurrency(adjustedPjMonthlyCost)} isTotal />
+              <ResultRow label="Custo anual estimado" value={formatCurrency(adjustedPjAnnualCost)} />
+              <ResultRow label="Líquido colaborador" value={formatCurrency(results.employee.netSalary)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Diferença */}
+        <div className={`rounded-lg p-4 mb-4 text-center ${realSavingsVsClt > 0 ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-green-900/30 border border-green-700/50'}`}>
+          {realSavingsVsClt > 0 ? (
+            <p className="font-bold text-amber-300 text-base">
+              PJ pode reduzir custos em até{' '}
+              <span className="text-white">{formatCurrency(realSavingsVsClt)}/mês</span> —{' '}
+              <span className="text-white">{formatCurrency(realAnnualSavingsVsClt)}/ano</span> neste cenário
+            </p>
+          ) : (
+            <p className="font-bold text-green-300 text-base">
+              CLT é mais econômico neste cenário:{' '}
+              <span className="text-white">{formatCurrency(-realSavingsVsClt)}/mês</span> a menos que PJ
+            </p>
+          )}
+        </div>
+
+        {/* Risco jurídico */}
+        <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-lg p-4 mb-4">
+          <p className="text-yellow-300 font-semibold text-sm mb-1">⚠ Atenção: risco jurídico</p>
+          <p className="text-gray-300 text-sm">
+            Esta economia é válida somente se o profissional é genuinamente autônomo. Exclusividade, horários fixos e subordinação direta podem caracterizar vínculo empregatício — gerando multas e passivos trabalhistas que superam anos de economia.
+          </p>
+        </div>
+
+        {/* Orientação de decisão */}
+        <div className="bg-gray-700/40 rounded-lg p-4">
+          <p className="text-sm font-semibold text-gray-300 mb-3">Orientação de decisão</p>
+          <div className="space-y-2">
+            <p className="text-sm text-gray-300">
+              <span className="text-indigo-300 font-semibold">Prefira CLT</span> quando há exclusividade, horários fixos, supervisão direta ou o papel é de longo prazo na operação.
+            </p>
+            <p className="text-sm text-gray-300">
+              <span className="text-cyan-300 font-semibold">Prefira PJ</span> quando o profissional é autônomo, atende múltiplos clientes e trabalha por projeto ou demanda específica.
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 mt-3">
+            Simulação para fins educacionais. Valores baseados nas tabelas de 2024. Consulte um contador ou advogado trabalhista antes de estruturar contratos PJ.
+          </p>
         </div>
       </div>
     </div>
