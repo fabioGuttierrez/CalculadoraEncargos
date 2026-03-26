@@ -46,6 +46,8 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
   const [includePjCounter, setIncludePjCounter] = useState(true);
   const [pjCounterCost, setPjCounterCost] = useState(150);
   const [includePjProLaboreInss, setIncludePjProLaboreInss] = useState(false);
+  const [pjMode, setPjMode] = useState<'match' | 'specific'>('match');
+  const [pjSpecificNF, setPjSpecificNF] = useState(0);
 
   const handleExportCSV = () => {
     if (!results) return;
@@ -114,10 +116,14 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
 
   const PJ_PROLABORE_INSS_EST = 167;
   const pjHiddenCosts = (includePjCounter ? pjCounterCost : 0) + (includePjProLaboreInss ? PJ_PROLABORE_INSS_EST : 0);
-  const adjustedPjMonthlyCost = comparison.pjGrossToMatchNet + pjHiddenCosts;
+  const pjNFValue = pjMode === 'match' ? comparison.pjGrossToMatchNet : pjSpecificNF;
+  const pjWorkerNet = pjMode === 'match' ? results.employee.netSalary : parseFloat((pjSpecificNF * (1 - pjTaxRate)).toFixed(2));
+  const pjTaxPaid = parseFloat((pjNFValue * pjTaxRate).toFixed(2));
+  const adjustedPjMonthlyCost = pjNFValue + pjHiddenCosts;
   const adjustedPjAnnualCost = adjustedPjMonthlyCost * 12;
   const realSavingsVsClt = results.employer.totalCost - adjustedPjMonthlyCost;
   const realAnnualSavingsVsClt = comparison.annualCltCost - adjustedPjAnnualCost;
+  const workerNetDiff = pjWorkerNet - results.employee.netSalary;
   const fgtsRateLabel = results.inputs.contractType === 'apprentice' ? '2%' : '8%';
   const fgtsTooltip = `Depósito mensal de ${fgtsRateLabel} sobre o salário bruto em uma conta vinculada ao colaborador, sem desconto do seu salário. A alíquota para aprendizes é de 2%.`;
   const employerTaxesTooltip = "Contribuições para Risco Ambiental de Trabalho (RAT) e outras entidades (Sistema S). Alíquota média de 5.8%. Aplicável apenas em Lucro Presumido/Real.";
@@ -200,7 +206,7 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
           <h3 className="text-xl font-bold text-cyan-400">Comparativo CLT × PJ</h3>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-400 whitespace-nowrap">Regime PJ:</label>
@@ -214,6 +220,22 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
               <option value={0.155}>Simples Nacional ~15,5%</option>
             </select>
           </div>
+        </div>
+
+        {/* Mode Toggle */}
+        <div className="flex rounded-lg overflow-hidden border border-gray-600 mb-5">
+          <button
+            onClick={() => setPjMode('match')}
+            className={`flex-1 px-3 py-1.5 text-sm font-medium transition-colors ${pjMode === 'match' ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
+          >
+            Igualar líquido (automático)
+          </button>
+          <button
+            onClick={() => { if (pjMode === 'match') setPjSpecificNF(comparison.pjGrossToMatchNet); setPjMode('specific'); }}
+            className={`flex-1 px-3 py-1.5 text-sm font-medium transition-colors ${pjMode === 'specific' ? 'bg-cyan-700 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
+          >
+            Simular NF específica
+          </button>
         </div>
 
         {/* Custos operacionais do PJ */}
@@ -265,33 +287,78 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results }) => {
 
           {/* PJ */}
           <div className="bg-cyan-900/30 border border-cyan-700/50 rounded-lg p-4">
-            <h4 className="font-bold text-cyan-300 mb-3 text-center text-sm uppercase tracking-wide">PJ — custo estimado real</h4>
+            <h4 className="font-bold text-cyan-300 mb-3 text-center text-sm uppercase tracking-wide">
+              {pjMode === 'match' ? 'PJ — custo estimado real' : 'PJ — simulação de NF específica'}
+            </h4>
             <div className="space-y-1">
-              <ResultRow label="Nota fiscal mensal" value={formatCurrency(comparison.pjGrossToMatchNet)} />
+              {pjMode === 'specific' ? (
+                <>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                    <span className="text-gray-300 text-sm">Nota fiscal informada</span>
+                    <input
+                      type="number"
+                      value={pjSpecificNF || ''}
+                      onChange={(e) => setPjSpecificNF(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-32 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-white text-sm text-right"
+                      min="0"
+                      placeholder="0"
+                    />
+                  </div>
+                  <ResultRow label={`(-) Impostos PJ (~${(pjTaxRate * 100).toFixed(1)}%)`} value={`- ${formatCurrency(pjTaxPaid)}`} isNegative />
+                  <ResultRow label="(=) Líquido trabalhador" value={formatCurrency(pjWorkerNet)} isTotal />
+                </>
+              ) : (
+                <>
+                  <ResultRow label="Nota fiscal mensal" value={formatCurrency(comparison.pjGrossToMatchNet)} />
+                  <ResultRow label="Líquido colaborador" value={formatCurrency(results.employee.netSalary)} />
+                </>
+              )}
               {includePjCounter && <ResultRow label="(+) Contador est." value={formatCurrency(pjCounterCost)} />}
               {includePjProLaboreInss && <ResultRow label="(+) INSS pró-labore est." value={formatCurrency(PJ_PROLABORE_INSS_EST)} />}
-              <ResultRow label="Custo total estimado" value={formatCurrency(adjustedPjMonthlyCost)} isTotal />
-              <ResultRow label="Custo anual estimado" value={formatCurrency(adjustedPjAnnualCost)} />
-              <ResultRow label="Líquido colaborador" value={formatCurrency(results.employee.netSalary)} />
+              <ResultRow label="Custo total empresa" value={formatCurrency(adjustedPjMonthlyCost)} isTotal={pjMode === 'match'} />
+              <ResultRow label="Custo anual empresa" value={formatCurrency(adjustedPjAnnualCost)} />
             </div>
           </div>
         </div>
 
         {/* Diferença */}
-        <div className={`rounded-lg p-4 mb-4 text-center ${realSavingsVsClt > 0 ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-green-900/30 border border-green-700/50'}`}>
-          {realSavingsVsClt > 0 ? (
-            <p className="font-bold text-amber-300 text-base">
-              PJ pode reduzir custos em até{' '}
-              <span className="text-white">{formatCurrency(realSavingsVsClt)}/mês</span> —{' '}
-              <span className="text-white">{formatCurrency(realAnnualSavingsVsClt)}/ano</span> neste cenário
-            </p>
-          ) : (
-            <p className="font-bold text-green-300 text-base">
-              CLT é mais econômico neste cenário:{' '}
-              <span className="text-white">{formatCurrency(-realSavingsVsClt)}/mês</span> a menos que PJ
-            </p>
-          )}
-        </div>
+        {pjMode === 'match' ? (
+          <div className={`rounded-lg p-4 mb-4 text-center ${realSavingsVsClt > 0 ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-green-900/30 border border-green-700/50'}`}>
+            {realSavingsVsClt > 0 ? (
+              <p className="font-bold text-amber-300 text-base">
+                PJ pode reduzir custos em até{' '}
+                <span className="text-white">{formatCurrency(realSavingsVsClt)}/mês</span> —{' '}
+                <span className="text-white">{formatCurrency(realAnnualSavingsVsClt)}/ano</span> neste cenário
+              </p>
+            ) : (
+              <p className="font-bold text-green-300 text-base">
+                CLT é mais econômico neste cenário:{' '}
+                <span className="text-white">{formatCurrency(-realSavingsVsClt)}/mês</span> a menos que PJ
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className={`rounded-lg p-4 text-center ${workerNetDiff >= 0 ? 'bg-cyan-900/30 border border-cyan-700/50' : 'bg-indigo-900/30 border border-indigo-700/50'}`}>
+              <p className="text-xs text-gray-400 mb-1 uppercase tracking-wide">Bolso do trabalhador</p>
+              {workerNetDiff >= 0 ? (
+                <p className="font-bold text-cyan-300">PJ rende <span className="text-white">{formatCurrency(workerNetDiff)}/mês a mais</span></p>
+              ) : (
+                <p className="font-bold text-indigo-300">CLT rende <span className="text-white">{formatCurrency(-workerNetDiff)}/mês a mais</span></p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">CLT: {formatCurrency(results.employee.netSalary)} | PJ: {formatCurrency(pjWorkerNet)}</p>
+            </div>
+            <div className={`rounded-lg p-4 text-center ${realSavingsVsClt >= 0 ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-green-900/30 border border-green-700/50'}`}>
+              <p className="text-xs text-gray-400 mb-1 uppercase tracking-wide">Custo para a empresa</p>
+              {realSavingsVsClt >= 0 ? (
+                <p className="font-bold text-amber-300">PJ economiza <span className="text-white">{formatCurrency(realSavingsVsClt)}/mês</span></p>
+              ) : (
+                <p className="font-bold text-green-300">CLT custa <span className="text-white">{formatCurrency(-realSavingsVsClt)}/mês a menos</span></p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">CLT: {formatCurrency(results.employer.totalCost)} | PJ: {formatCurrency(adjustedPjMonthlyCost)}</p>
+            </div>
+          </div>
+        )}
 
         {/* Risco jurídico */}
         <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-lg p-4 mb-4">
